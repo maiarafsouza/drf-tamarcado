@@ -6,6 +6,9 @@ class AgendamentoSerializer(serializers.Serializer):
     nome_cliente = serializers.CharField(max_length=200)
     email_cliente = serializers.EmailField()
     telefone_cliente = serializers.CharField(max_length=20)
+
+    # When only validated_data is passed from view to function, the create function is used
+    # When instance and validated_data are passed from view to function, the update function is used
     
     def create(self, validated_data):
         agendamento = Agendamento.instance.create(

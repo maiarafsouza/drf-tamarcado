@@ -10,13 +10,13 @@ from agenda.serializers import AgendamentoSerializer
 
 @api_view(http_method_names=['GET', 'PUT', 'PATCH', 'DELETE'])
 def agendamento_detail(request, id):
+    obj = get_object_or_404(Agendamento, id=id)
+
     if request.method == 'GET':
-        obj = get_object_or_404(Agendamento, id=id)
         serializer = AgendamentoSerializer(obj)
         return JsonResponse(serializer.data) # Transforms python dict (serializer.data) in json type response
 
     if request.method == 'PATCH': # Subtitutes obj partialy
-        obj = get_object_or_404(Agendamento, id=id)
         serializer = AgendamentoSerializer(obj, data=request.data, partial=True) # partial=True, accepts partial data on this serializer instance
         if serializer.is_valid():
             serializer.save()
@@ -33,7 +33,6 @@ def agendamento_detail(request, id):
         return JsonResponse(serializer.errors, status=400)
     
     if request.method == 'DELETE':
-        obj = get_object_or_404(Agendamento, id=id)
         obj.status_cancelado = True # Changes canceled attribute
         obj.save()
         return Response(status=204)
