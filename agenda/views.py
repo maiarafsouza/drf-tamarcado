@@ -1,53 +1,62 @@
-from functools import partial
+from datetime import datetime
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from django.contrib.auth.models import User
 from rest_framework.decorators import api_view
-from rest_framework.response import Response
+from rest_framework import permissions
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
 from agenda.models import Agendamento
-from agenda.serializers import AgendamentoSerializer
+from agenda.serializers import AgendamentoSerializer, PrestadorSerializer
+from agenda.utils import get_horarios_disponiveis
 
 # Create your views here.
 
-@api_view(http_method_names=['GET', 'PUT', 'PATCH', 'DELETE'])
-def agendamento_detail(request, id):
-    obj = get_object_or_404(Agendamento, id=id)
+class IsOwnerOrCreateOnly(permissions.BasePermission): # API/URL level permission
+    def has_permission(self, request, view):
+        if request.method == 'POST':
+            return True
+        username = request.query_params.get('username', None)
+        if request.user.username == username:
+            return True
+        return False
 
-    if request.method == 'GET':
-        serializer = AgendamentoSerializer(obj)
-        return JsonResponse(serializer.data) # Transforms python dict (serializer.data) in json type response
+class IsPrestador(permissions.BasePermission): # Object level permission
+    def has_object_permission(self, request, view, obj):
+        if obj.prestador == request.user:
+            return True
+        return False
 
-    if request.method == 'PATCH': # Subtitutes obj partialy
-        serializer = AgendamentoSerializer(obj, data=request.data, partial=True) # partial=True, accepts partial data on this serializer instance
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data, status=200)
-        return JsonResponse(serializer.errors, status=400)
+class AgendamentoDetail(RetrieveUpdateDestroyAPIView): # /api/agendamentos/<id>
+    serializer_class = AgendamentoSerializer
+    lookup_field = 'id'
+    queryset = Agendamento.objects.all()
+    permission_classes = [IsPrestador]
 
-#    if request.method == 'PUT': # Subtitutes obj entirely
-        obj = get_object_or_404(Agendamento, id=id)
-        serializer = AgendamentoSerializer(data=request.data)
-        if serializer.is_valid():
-            validated_data = serializer.validated_data
-            serializer.save()
-            return JsonResponse(serializer.data, status=200)
-        return JsonResponse(serializer.errors, status=400)
-    
-    if request.method == 'DELETE':
-        obj.status_cancelado = True # Changes canceled attribute
+    def perform_destroy(self, obj):
+        obj.status_cancelado = True
         obj.save()
-        return Response(status=204)
 
-@api_view(http_method_names=['GET', 'POST'])
-def agendamento_list(request):
-    if request.method == 'GET':
-        qs = Agendamento.objects.exclude(status_cancelado=True) # qs == queryset, excludes canceled events
-        serializer = AgendamentoSerializer(qs, many=True)
-        return JsonResponse(serializer.data, safe=False)
-    if request.method == 'POST':
-        data = request.data # JSON dict
-        serializer = AgendamentoSerializer(data=data)
-        if serializer.is_valid(): # Validates inputed data and populates validated data attribute in serializer obj
-            validated_data = serializer.validated_data
-            serializer.save() # Calls AgendamentoSerializers.create
-            return JsonResponse(serializer.data, status=201) # 201, standard message for object creation
-        return JsonResponse(serializer.errors, status=400)
+class AgendamentoList(ListCreateAPIView): # /api/agendamentos/?username=name
+    serializer_class = AgendamentoSerializer
+    permission_classes = [IsOwnerOrCreateOnly]
+    def get_queryset(self):
+        username = self.request.query_params.get('username', None)
+        queryset = Agendamento.objects.filter(prestador__username=username, status_cancelado=False)
+        return queryset
+
+class PrestadorList(ListAPIView): # /api/prestadores
+    serializer_class = PrestadorSerializer
+    queryset = User.objects.all()
+
+
+@api_view(http_method_names=['GET']) # 
+def get_horarios(request):
+    data = request.query_params.get('data')
+    if not data:
+        data = datetime.now().date()
+    else:
+        data = datetime.fromisoformat(data).date()
+    
+    horarios_disponiveis = sorted(list(get_horarios_disponiveis(data)))
+    return JsonResponse(horarios_disponiveis, safe=False)
+
