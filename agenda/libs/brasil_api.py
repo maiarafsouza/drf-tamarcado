@@ -1,18 +1,24 @@
 from datetime import date
-import imp
 import requests
 from django.conf import settings
+import os
+import logging
 
 def is_feriado(data: date):
+    logging.info(f'Fazendo requisição para BrasilAPI para data: {data.isoformat()}')
     if settings.TESTING == True:
+        logging.info(f'Requisição para BrasilAPI com TESTING=True')
         if data.day == 10 and data.month == 10:
             return True
         return False
 
     ano = data.year
-    r = requests.get(f'https://brasilapi.com.br/api/feriados/v1/{ano}')
+
+    BRASIL_API_URL = os.environ.get('BRASIL_API_URL', 'https://brasilapi.com.br/')
+    r = requests.get(f'{BRASIL_API_URL}{ano}')
     if r.status_code != 200:
-        raise ValueError('Não foi possível consultar')
+        logging.error('Erro na requisição para BrasilAPI')
+        return False
     feriados = r.json()
     for feriado in feriados:
         data_feriado_str = feriado['date']

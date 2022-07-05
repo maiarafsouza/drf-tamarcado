@@ -4,6 +4,7 @@ from urllib import request
 from rest_framework.test import APITestCase
 from agenda.models import Agendamento
 from django.contrib.auth.models import User
+from unittest import mock
 
 # Create your tests here.
 # json.dumps(): recieve python data structure (dict) and transforms into json dict
@@ -118,12 +119,14 @@ class TestDetalhaAgendamento(APITestCase):
         self.assertEqual(response_data['telefone_cliente'], '99998888')
 
 class TestGetHorarios(APITestCase):
-    def test_quando_feriado_retorna_lista_vazia(self):
-        response = self.client.get('/api/horarios/?data=2022-10-10')
+    @mock.patch('agenda.libs.brasil_api.is_feriado', return_value=True)
+    def test_quando_feriado_retorna_lista_vazia(self, _): # _ is a convention used to indicate an argument that's not used by the functioon. In this case the mocked is_feriado, it has to be passed
+        response = self.client.get('/api/horarios/?data=2022-12-25')
         py_response = json.loads(response.content)
         self.assertEqual(py_response, [])
-        
-    def test_quando_dia_util_retorna_horarios(self):
+
+    @mock.patch('agenda.libs.brasil_api.is_feriado', return_value=False)
+    def test_quando_dia_util_retorna_horarios(self, _):
         response = self.client.get('/api/horarios/?data=2022-10-03')
         py_response = json.loads(response.content)
         self.assertNotEqual(py_response, [])

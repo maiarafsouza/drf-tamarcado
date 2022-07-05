@@ -50,7 +50,6 @@ class AgendamentoSerializer(serializers.ModelSerializer):
         telefone_cliente = attrs.get('telefone_cliente', '')
         data_horario = attrs.get('data_horario', '')
 
-
         if email_cliente.endswith('.br') and telefone_cliente.startswith('+') and not telefone_cliente.startswith('+55'):
             raise serializers.ValidationError('Email brasileiro deve estar associado a telefone brasileiro (+55)')
 
